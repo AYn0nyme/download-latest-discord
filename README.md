@@ -6,3 +6,9 @@ Downloads and install Discord to chosen path (updates if already installed)
 ./download-latest-discord <PATH>
 # If path is not provided, then installs to /opt/Discord
 ```
+
+## Building
+No dependencies are required, except [Go](https://go.dev)
+```sh
+go build .
+```
