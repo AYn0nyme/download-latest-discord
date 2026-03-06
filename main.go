@@ -30,11 +30,11 @@ const (
 )
 
 
-var EXTRACT_TO = "/opt/Discord"
+var EXTRACT_TO = "/opt"
 var TEMP_DIR string
 
 func main() {
-	if len(os.Args) > 1 {
+	if len(os.Args) >= 2 {
 		EXTRACT_TO = os.Args[1]
 	}
 	if !isWritable(EXTRACT_TO) {
@@ -136,14 +136,14 @@ func main() {
 		}
 	}
 
-	os.Mkdir(EXTRACT_TO, 0755)
+	os.Mkdir(path.Join(EXTRACT_TO, "Discord"), 0755)
 
 	entries, err := os.ReadDir(path.Join(TEMP_DIR, "Discord"))
 
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Copying files from %s/Discord to %s\n", TEMP_DIR, EXTRACT_TO)
+	fmt.Printf("Copying files from %s/Discord to %s/Discord\n", TEMP_DIR, EXTRACT_TO)
 	ReadFilesAndWrite("", entries)
 	println("Downloaded Discord successfully!")
 
@@ -153,7 +153,7 @@ func main() {
 func ReadFilesAndWrite(RelPath string, entries []os.DirEntry) {
 	for _, entry := range entries {
 		if entry.IsDir() {
-			if err := os.Mkdir(path.Join(EXTRACT_TO, RelPath, entry.Name()), 0755); err != nil && !errors.Is(err, os.ErrExist) {
+			if err := os.Mkdir(path.Join(EXTRACT_TO, "Discord", RelPath, entry.Name()), 0755); err != nil && !errors.Is(err, os.ErrExist) {
 				panic(err)
 			}
 			dirEntries, err := os.ReadDir(path.Join(TEMP_DIR, "Discord", RelPath, entry.Name()))
@@ -166,7 +166,7 @@ func ReadFilesAndWrite(RelPath string, entries []os.DirEntry) {
 			if err != nil {
 				panic(err)
 			}
-			fileWriter, err := os.OpenFile(path.Join(EXTRACT_TO, RelPath, entry.Name()), os.O_CREATE|os.O_WRONLY, infos.Mode())
+			fileWriter, err := os.OpenFile(path.Join(EXTRACT_TO, "Discord", RelPath, entry.Name()), os.O_CREATE|os.O_WRONLY, infos.Mode())
 			if err != nil {
 				panic(err)
 			}
