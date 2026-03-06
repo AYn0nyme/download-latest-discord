@@ -147,6 +147,7 @@ func main() {
 	println("Downloaded Discord successfully!")
 
 	os.RemoveAll(TEMP_DIR)
+	os.Remove("/tmp/discord.tar.gz")
 }
 
 func ReadFilesAndWrite(RelPath string, entries []os.DirEntry) {
