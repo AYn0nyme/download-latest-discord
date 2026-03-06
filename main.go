@@ -17,28 +17,27 @@ import (
 // Posted by Chris Hopkins
 // Retrieved 2026-03-04, License - CC BY-SA 3.0
 const (
-	OS_WRITE = 02
-	OS_USER_SHIFT = 6
+	OS_WRITE       = 02
+	OS_USER_SHIFT  = 6
 	OS_GROUP_SHIFT = 3
-	OS_OTH_SHIFT = 0
+	OS_OTH_SHIFT   = 0
 
-	OS_USER_W = OS_WRITE<<OS_USER_SHIFT
+	OS_USER_W = OS_WRITE << OS_USER_SHIFT
 
-	OS_GROUP_W = OS_WRITE<<OS_GROUP_SHIFT
+	OS_GROUP_W = OS_WRITE << OS_GROUP_SHIFT
 
-	OS_OTH_W = OS_WRITE<<OS_OTH_SHIFT
+	OS_OTH_W = OS_WRITE << OS_OTH_SHIFT
 )
 
-
-var EXTRACT_TO = "/opt"
+var PREFIX = "/opt"
 var TEMP_DIR string
 
 func main() {
 	if len(os.Args) >= 2 {
-		EXTRACT_TO = os.Args[1]
+		PREFIX = os.Args[1]
 	}
-	if !isWritable(EXTRACT_TO) {
-		fmt.Printf("Cannot write to %s.\n", EXTRACT_TO)
+	if !isWritable(PREFIX) {
+		fmt.Printf("Cannot write to %s.\n", PREFIX)
 		os.Exit(1)
 	}
 	req, err := http.NewRequest("GET", "https://discord.com/api/download?platform=linux&format=tar.gz", nil)
@@ -136,14 +135,14 @@ func main() {
 		}
 	}
 
-	os.Mkdir(path.Join(EXTRACT_TO, "Discord"), 0755)
+	os.Mkdir(path.Join(PREFIX, "Discord"), 0755)
 
 	entries, err := os.ReadDir(path.Join(TEMP_DIR, "Discord"))
 
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Copying files from %s/Discord to %s/Discord\n", TEMP_DIR, EXTRACT_TO)
+	fmt.Printf("Copying files from %s/Discord to %s/Discord\n", TEMP_DIR, PREFIX)
 	ReadFilesAndWrite("", entries)
 	println("Downloaded Discord successfully!")
 
@@ -153,7 +152,7 @@ func main() {
 func ReadFilesAndWrite(RelPath string, entries []os.DirEntry) {
 	for _, entry := range entries {
 		if entry.IsDir() {
-			if err := os.Mkdir(path.Join(EXTRACT_TO, "Discord", RelPath, entry.Name()), 0755); err != nil && !errors.Is(err, os.ErrExist) {
+			if err := os.Mkdir(path.Join(PREFIX, "Discord", RelPath, entry.Name()), 0755); err != nil && !errors.Is(err, os.ErrExist) {
 				panic(err)
 			}
 			dirEntries, err := os.ReadDir(path.Join(TEMP_DIR, "Discord", RelPath, entry.Name()))
@@ -166,7 +165,7 @@ func ReadFilesAndWrite(RelPath string, entries []os.DirEntry) {
 			if err != nil {
 				panic(err)
 			}
-			fileWriter, err := os.OpenFile(path.Join(EXTRACT_TO, "Discord", RelPath, entry.Name()), os.O_CREATE|os.O_WRONLY, infos.Mode())
+			fileWriter, err := os.OpenFile(path.Join(PREFIX, "Discord", RelPath, entry.Name()), os.O_CREATE|os.O_WRONLY, infos.Mode())
 			if err != nil {
 				panic(err)
 			}
@@ -198,7 +197,7 @@ func isWritable(Entry string) bool {
 	if i == nil {
 		return false
 	}
-	if (uint32(os.Getgid()) == i.Gid && (i.Mode & uint32(OS_GROUP_W)) != 0) || (uint32(os.Getuid()) == i.Uid && (i.Mode & uint32(OS_USER_W)) != 0) || (i.Mode & uint32(OS_OTH_W)) != 0 {
+	if (uint32(os.Getgid()) == i.Gid && (i.Mode&uint32(OS_GROUP_W)) != 0) || (uint32(os.Getuid()) == i.Uid && (i.Mode&uint32(OS_USER_W)) != 0) || (i.Mode&uint32(OS_OTH_W)) != 0 {
 		return true
 	}
 	return false
