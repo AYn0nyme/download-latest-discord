@@ -148,6 +148,32 @@ func main() {
 
 	os.RemoveAll(TEMP_DIR)
 	os.Remove("/tmp/discord.tar.gz")
+	var applicationsSharePath = "/usr/share/applications"
+	if !isWritable("/usr/share/applications") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			println("Unable to get home dir, and /usr/share/applications is not writable.\nExiting...")
+			os.Exit(0)
+		}
+		applicationsSharePath = path.Join(homeDir, ".local", "share", "applications")
+	}
+	applicationsSharePath = path.Join(applicationsSharePath, "Discord.desktop")
+	desktopEntryIn, err := os.OpenFile("Discord.desktop", os.O_RDONLY, 0755)
+	if err != nil {
+		println("Unable to read Discord.desktop\nExiting...")
+		os.Exit(0)
+	}
+
+	desktopEntryOut, err := os.OpenFile(applicationsSharePath, os.O_WRONLY|os.O_CREATE, 0755)
+	if err != nil {
+		println("Unable to write Discord.desktop to " + applicationsSharePath + "\nExiting...")
+		os.Exit(0)
+	}
+	if _, err = io.Copy(desktopEntryOut, desktopEntryIn); err != nil {
+		println("Couldn't write to " + applicationsSharePath + ".\nExiting...")
+		os.Exit(0)
+	}
+	println("Installed Discord.desktop to", applicationsSharePath)
 }
 
 func ReadFilesAndWrite(RelPath string, entries []os.DirEntry) {
@@ -198,7 +224,7 @@ func isWritable(Entry string) bool {
 	if i == nil {
 		return false
 	}
-	if (uint32(os.Getgid()) == i.Gid && (i.Mode&uint32(OS_GROUP_W)) != 0) || (uint32(os.Getuid()) == i.Uid && (i.Mode&uint32(OS_USER_W)) != 0) || (i.Mode&uint32(OS_OTH_W)) != 0 {
+	if (uint32(os.Getgid()) == i.Gid && (i.Mode&uint16(OS_GROUP_W)) != 0) || (uint32(os.Getuid()) == i.Uid && (i.Mode&uint16(OS_USER_W)) != 0) || (i.Mode&uint16(OS_OTH_W)) != 0 {
 		return true
 	}
 	return false

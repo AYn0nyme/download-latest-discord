@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Discord
+Type=Application
+Icon=discord
+Path={PATH}
+Exec=Discord
+Terminal=false
+Categories=Internet;Messaging
