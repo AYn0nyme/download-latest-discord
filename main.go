@@ -229,7 +229,7 @@ func isWritable(Entry string) bool {
 	if i == nil {
 		return false
 	}
-	if (uint32(os.Getgid()) == i.Gid && (i.Mode&uint16(OS_GROUP_W)) != 0) || (uint32(os.Getuid()) == i.Uid && (i.Mode&uint16(OS_USER_W)) != 0) || (i.Mode&uint16(OS_OTH_W)) != 0 {
+	if (uint32(os.Getgid()) == i.Gid && (i.Mode&uint32(OS_GROUP_W)) != 0) || (uint32(os.Getuid()) == i.Uid && (i.Mode&uint32(OS_USER_W)) != 0) || (i.Mode&uint32(OS_OTH_W)) != 0 {
 		return true
 	}
 	return false
