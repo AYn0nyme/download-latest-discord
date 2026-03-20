@@ -174,10 +174,12 @@ func main() {
 		println("Couldn't read Discord.desktop.\nExiting...")
 		os.Exit(0)
 	}
-	if _, err = io.WriteString(desktopEntryOut, strings.ReplaceAll(string(bodyInBytes), "{PATH}", path.Join(PREFIX, "Discord", "Discord"))); err != nil {
+	if _, err = io.WriteString(desktopEntryOut, strings.ReplaceAll(string(bodyInBytes), "{PATH}", path.Join(PREFIX, "Discord"))); err != nil {
 		println("Couldn't write to " + applicationsSharePath + ".\nExiting...")
 		os.Exit(0)
 	}
+	desktopEntryIn.Close()
+	desktopEntryOut.Close()
 	println("Installed Discord.desktop to", applicationsSharePath)
 }
 
