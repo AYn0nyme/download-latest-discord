@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 	"syscall"
@@ -28,9 +29,11 @@ const (
 
 	OS_OTH_W = OS_WRITE << OS_OTH_SHIFT
 )
+const VENCORD_CLI = "https://github.com/Vendicated/VencordInstaller/releases/latest/download/VencordInstallerCli-Linux"
 
 var PREFIX = "/opt"
 var TEMP_DIR string
+var VENCORD_PATCH bool
 
 func main() {
 	if len(os.Args) >= 2 {
@@ -40,147 +43,198 @@ func main() {
 		fmt.Printf("Cannot write to %s.\n", PREFIX)
 		os.Exit(1)
 	}
-	req, err := http.NewRequest("GET", "https://discord.com/api/download?platform=linux&format=tar.gz", nil)
-	if err != nil {
-		panic(err)
-	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	if res.StatusCode != 200 {
-		println("HTTP Error:", res.Status)
-	}
-
-	outFile, err := os.Create("/tmp/discord.tar.gz")
-	if err != nil {
-		panic(err)
-	}
-
-	// Read by 64KB blocks chunks
-	buf := make([]byte, 64*1024)
-
-	var downloadedBytes int64
-
-	for {
-		n, err := res.Body.Read(buf)
-		if err == io.EOF {
-			break
+	for _, arg := range os.Args {
+		if !strings.HasPrefix(arg, "--") {
+			PREFIX = arg
 		}
+		if arg == "--patch-vencord" {
+			VENCORD_PATCH = true
+		}
+	}
+	if !hasDiscord(PREFIX) {
+		req, err := http.NewRequest("GET", "https://discord.com/api/download?platform=linux&format=tar.gz", nil)
 		if err != nil {
 			panic(err)
 		}
-		outFile.Write(buf[:n])
-		downloadedBytes += int64(n)
-		fmt.Printf("\rDownloading... %d%%", 100*downloadedBytes/res.ContentLength)
-	}
 
-	println()
-
-	res.Body.Close()
-	outFile.Close()
-
-	outFile, err = os.Open("/tmp/discord.tar.gz")
-
-	if err != nil {
-		panic(err)
-	}
-
-	println("Downloaded discord to /tmp/discord.tar.gz")
-
-	tarContent, err := gzip.NewReader(outFile)
-	if err != nil {
-		panic(err)
-	}
-
-	tarReader := tar.NewReader(tarContent)
-	TEMP_DIR, err = os.MkdirTemp("/tmp", "discord-")
-	if err != nil {
-		panic(err)
-	}
-
-	println("Extracting /tmp/discord.tar.gz to", TEMP_DIR)
-
-	for {
-		hdr, err := tarReader.Next()
-
-		if err == io.EOF {
-			break
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			panic(err)
 		}
+
+		if res.StatusCode != 200 {
+			println("HTTP Error:", res.Status)
+		}
+
+		outFile, err := os.Create("/tmp/discord.tar.gz")
+		if err != nil {
+			panic(err)
+		}
+
+		// Read by 64KB blocks chunks
+		buf := make([]byte, 64*1024)
+
+		var downloadedBytes int64
+
+		for {
+			n, err := res.Body.Read(buf)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				panic(err)
+			}
+			outFile.Write(buf[:n])
+			downloadedBytes += int64(n)
+			fmt.Printf("\rDownloading... %d%%", 100*downloadedBytes/res.ContentLength)
+		}
+
+		println()
+
+		res.Body.Close()
+		outFile.Close()
+
+		outFile, err = os.Open("/tmp/discord.tar.gz")
 
 		if err != nil {
 			panic(err)
 		}
 
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			err = os.Mkdir(path.Join(TEMP_DIR, hdr.Name), 0777)
-			if err != nil {
-				panic(err)
-			}
-		case tar.TypeReg:
-			newFile, err := os.Create(path.Join(TEMP_DIR, hdr.Name))
-			newFile.Chmod(hdr.FileInfo().Mode())
-			if err != nil {
-				panic(err)
-			}
+		println("Downloaded discord to /tmp/discord.tar.gz")
 
-			if _, err = io.Copy(newFile, tarReader); err != nil {
-				panic(err)
-			}
-			newFile.Close()
-
-		}
-	}
-
-	os.Mkdir(path.Join(PREFIX, "Discord"), 0755)
-
-	entries, err := os.ReadDir(path.Join(TEMP_DIR, "Discord"))
-
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Copying files from %s/Discord to %s/Discord\n", TEMP_DIR, PREFIX)
-	ReadFilesAndWrite("", entries)
-	println("Downloaded Discord successfully!")
-
-	os.RemoveAll(TEMP_DIR)
-	os.Remove("/tmp/discord.tar.gz")
-	var applicationsSharePath = "/usr/share/applications"
-	if !isWritable("/usr/share/applications") {
-		homeDir, err := os.UserHomeDir()
+		tarContent, err := gzip.NewReader(outFile)
 		if err != nil {
-			println("Unable to get home dir, and /usr/share/applications is not writable.\nExiting...")
+			panic(err)
+		}
+
+		tarReader := tar.NewReader(tarContent)
+		TEMP_DIR, err = os.MkdirTemp("/tmp", "discord-")
+		if err != nil {
+			panic(err)
+		}
+
+		println("Extracting /tmp/discord.tar.gz to", TEMP_DIR)
+
+		for {
+			hdr, err := tarReader.Next()
+
+			if err == io.EOF {
+				break
+			}
+
+			if err != nil {
+				panic(err)
+			}
+
+			switch hdr.Typeflag {
+			case tar.TypeDir:
+				err = os.Mkdir(path.Join(TEMP_DIR, hdr.Name), 0777)
+				if err != nil {
+					panic(err)
+				}
+			case tar.TypeReg:
+				newFile, err := os.Create(path.Join(TEMP_DIR, hdr.Name))
+				newFile.Chmod(hdr.FileInfo().Mode())
+				if err != nil {
+					panic(err)
+				}
+
+				if _, err = io.Copy(newFile, tarReader); err != nil {
+					panic(err)
+				}
+				newFile.Close()
+
+			}
+		}
+
+		os.Mkdir(path.Join(PREFIX, "Discord"), 0755)
+
+		entries, err := os.ReadDir(path.Join(TEMP_DIR, "Discord"))
+
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Copying files from %s/Discord to %s/Discord\n", TEMP_DIR, PREFIX)
+		ReadFilesAndWrite("", entries)
+		println("Downloaded Discord successfully!")
+
+		os.RemoveAll(TEMP_DIR)
+		os.Remove("/tmp/discord.tar.gz")
+		var applicationsSharePath = "/usr/share/applications"
+		if !isWritable("/usr/share/applications") {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				println("Unable to get home dir, and /usr/share/applications is not writable.\nExiting...")
+				os.Exit(0)
+			}
+			applicationsSharePath = path.Join(homeDir, ".local", "share", "applications")
+		}
+		applicationsSharePath = path.Join(applicationsSharePath, "Discord.desktop")
+		desktopEntryIn, err := os.OpenFile("Discord.desktop", os.O_RDONLY, 0755)
+		if err != nil {
+			println("Unable to read Discord.desktop\nExiting...")
 			os.Exit(0)
 		}
-		applicationsSharePath = path.Join(homeDir, ".local", "share", "applications")
-	}
-	applicationsSharePath = path.Join(applicationsSharePath, "Discord.desktop")
-	desktopEntryIn, err := os.OpenFile("Discord.desktop", os.O_RDONLY, 0755)
-	if err != nil {
-		println("Unable to read Discord.desktop\nExiting...")
-		os.Exit(0)
-	}
 
-	desktopEntryOut, err := os.OpenFile(applicationsSharePath, os.O_WRONLY|os.O_CREATE, 0755)
-	if err != nil {
-		println("Unable to write Discord.desktop to " + applicationsSharePath + "\nExiting...")
-		os.Exit(0)
+		desktopEntryOut, err := os.OpenFile(applicationsSharePath, os.O_WRONLY|os.O_CREATE, 0755)
+		if err != nil {
+			println("Unable to write Discord.desktop to " + applicationsSharePath + "\nExiting...")
+			os.Exit(0)
+		}
+		bodyInBytes, err := io.ReadAll(desktopEntryIn)
+		if err != nil {
+			println("Couldn't read Discord.desktop.\nExiting...")
+			os.Exit(0)
+		}
+		if _, err = io.WriteString(desktopEntryOut, strings.ReplaceAll(string(bodyInBytes), "{PATH}", path.Join(PREFIX, "Discord"))); err != nil {
+			println("Couldn't write to " + applicationsSharePath + ".\nExiting...")
+			os.Exit(0)
+		}
+		desktopEntryIn.Close()
+		desktopEntryOut.Close()
+		println("Installed Discord.desktop to", applicationsSharePath)
 	}
-	bodyInBytes, err := io.ReadAll(desktopEntryIn)
-	if err != nil {
-		println("Couldn't read Discord.desktop.\nExiting...")
-		os.Exit(0)
+	if VENCORD_PATCH {
+		println("Downloading https://github.com/Vendicated/VencordInstaller/releases/latest/download/VencordInstallerCli-Linux to /tmp...")
+		tempFile, err := os.OpenFile("/tmp/VencordCli", os.O_WRONLY|os.O_CREATE, 0755)
+		if err != nil {
+			panic(err)
+		}
+
+		res, err := http.Get(VENCORD_CLI)
+		if err != nil {
+			panic(err)
+		}
+
+		buf := make([]byte, 64*1024)
+
+		var downloadedBytes int64
+
+		for {
+			n, err := res.Body.Read(buf)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				panic(err)
+			}
+			tempFile.Write(buf[:n])
+			downloadedBytes += int64(n)
+			fmt.Printf("\rDownloading... %d%%", 100*downloadedBytes/res.ContentLength)
+		}
+
+		tempFile.Close()
+		cmd := exec.Command("/tmp/VencordCli")
+
+		cmd.Stdout = os.Stdout
+		cmd.Stdin = os.Stdin
+		cmd.Stderr = os.Stderr
+
+		if err = cmd.Run(); err != nil {
+			panic(err)
+		}
+		os.Remove("/tmp/VencordCli")
 	}
-	if _, err = io.WriteString(desktopEntryOut, strings.ReplaceAll(string(bodyInBytes), "{PATH}", path.Join(PREFIX, "Discord"))); err != nil {
-		println("Couldn't write to " + applicationsSharePath + ".\nExiting...")
-		os.Exit(0)
-	}
-	desktopEntryIn.Close()
-	desktopEntryOut.Close()
-	println("Installed Discord.desktop to", applicationsSharePath)
 }
 
 func ReadFilesAndWrite(RelPath string, entries []os.DirEntry) {
@@ -235,4 +289,19 @@ func isWritable(Entry string) bool {
 		return true
 	}
 	return false
+}
+
+func hasDiscord(Path string) bool {
+	s, err := os.Stat(Path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	if !s.IsDir() {
+		Path, _ = path.Split(Path)
+	}
+	_, err = os.Stat(path.Join(Path, "Discord"))
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
 }
